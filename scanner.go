@@ -11,6 +11,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type K8sPodLister struct {
+	clientset *kubernetes.Clientset
+}
+
 func (r *ScannerReport) handleNamespaces(clientset *kubernetes.Clientset, ctx context.Context, printAllNamespaces bool) {
 	// --- List Namespaces; Pods and Container issues logic --- //
 	namespaces, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
@@ -21,6 +25,9 @@ func (r *ScannerReport) handleNamespaces(clientset *kubernetes.Clientset, ctx co
 	ch := make(chan []PodIssue)
 	var wg sync.WaitGroup
 	var nsCount int
+	lister := K8sPodLister{
+		clientset: clientset,
+	}
 	// Creaeting buffered channel to fight rate limiting
 	sem := make(chan struct{}, maxParallelRequests)
 
@@ -38,7 +45,7 @@ func (r *ScannerReport) handleNamespaces(clientset *kubernetes.Clientset, ctx co
 			defer wg.Done()
 			// Debug
 			// fmt.Printf("Verifying namespace: %s\n", name)
-			issues := scanNamespace(clientset, ctx, name)
+			issues := scanNamespace(lister, ctx, name)
 			ch <- issues
 		} (ns.Name)
 	}
@@ -57,15 +64,23 @@ func (r *ScannerReport) handleNamespaces(clientset *kubernetes.Clientset, ctx co
 	}
 }
 
-func scanNamespace(clientset *kubernetes.Clientset, ctx context.Context, nsName string) []PodIssue {
-	pods, err := clientset.CoreV1().Pods(nsName).List(ctx, metav1.ListOptions{})
+func (k K8sPodLister) ListPods(ctx context.Context, namespace string) ([]v1.Pod, error) {
+	pods, err := k.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
+
+func scanNamespace(lister PodLister, ctx context.Context, nsName string) []PodIssue {
+	pods, err := lister.ListPods(ctx, nsName)
 	if err != nil {
 		log.Fatalf("Error listing pods from namespace %s: %s", nsName, err)
 	}
 
 	// Pod iteration and status handling
 	var issues []PodIssue
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		var issue string
 		var restartCount int32
 		cs := pod.Status.ContainerStatuses

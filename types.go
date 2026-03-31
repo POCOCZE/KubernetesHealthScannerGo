@@ -4,6 +4,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type PodIssue struct {
@@ -29,6 +30,15 @@ type ScannerReport struct {
 
 type PodLister interface {
 	ListPods(ctx context.Context, namespace string) ([]v1.Pod, error)
+}
+
+type K8sPodLister struct {
+	clientset *kubernetes.Clientset
+}
+
+type TestPodLister struct {
+	Pods []v1.Pod
+	Err error
 }
 
 var (

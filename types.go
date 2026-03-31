@@ -1,5 +1,11 @@
 package main
 
+import (
+	"context"
+
+	v1 "k8s.io/api/core/v1"
+)
+
 type PodIssue struct {
 	Namespace string `json:"namespace"`
 	Pod string `json:"pod"`
@@ -19,6 +25,10 @@ type ScannerReport struct {
 	Nodes []Node `json:"nodes"`
 	NamespaceCount int `json:"namespace_count"`
 	PodIssues []PodIssue `json:"pod_issues"`
+}
+
+type PodLister interface {
+	ListPods(ctx context.Context, namespace string) ([]v1.Pod, error)
 }
 
 var (

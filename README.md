@@ -138,3 +138,7 @@ go run . -format json
  ]
 }
 ```
+
+## Issues & Contributing
+
+If you have any problems or ideas on other features to add, feel free to open an issue or create Pull Request.
